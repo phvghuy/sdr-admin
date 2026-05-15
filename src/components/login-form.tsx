@@ -94,7 +94,7 @@ export function LoginForm({
                   disabled={loading}
                   className="h-10 bg-white text-[#171717] hover:bg-white/90 disabled:opacity-60"
                 >
-                  {loading ? "Đang đăng nhập..." : "Login"}
+                  {loading ? "Login..." : "Login"}
                 </Button>
               </Field>
             </FieldGroup>
