@@ -243,6 +243,7 @@ export default function Orders() {
     }
 
     const { data, isLoading, isFetching } = useQuery({
+        staleTime: 30 * 1000,
         queryKey: ['orders', page, filters],
         queryFn: () => listOrders(page, PAGE_SIZE, filters),
         placeholderData: (prev) => prev,

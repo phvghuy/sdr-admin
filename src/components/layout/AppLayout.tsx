@@ -3,6 +3,7 @@ import { LayoutDashboard, Upload, Zap, Map, Package, LogOut, Truck, Car, Warehou
 import { useAuthStore } from '@/store/authStore'
 import { logout as logoutApi } from '@/api/auth'
 import { useJobPoller } from '@/hooks/useJobPoller'
+import { useWebSocket } from '@/hooks/useWebSocket'
 
 const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -16,6 +17,7 @@ const navItems = [
 
 export default function AppLayout() {
     useJobPoller()
+    useWebSocket()
     const logout = useAuthStore((s) => s.logout)
     const navigate = useNavigate()
 
