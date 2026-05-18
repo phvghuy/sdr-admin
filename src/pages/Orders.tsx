@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Loader2, Search } from 'lucide-react'
 import { listOrders, createOrder, updateOrder, deleteOrder } from '@/api/orders'
 import { listWarehouses } from '@/api/warehouses'
 import type { Order } from '@/types/api'
@@ -213,11 +213,44 @@ type ModalState =
     | { type: 'delete'; order: Order }
     | null
 
+const STATUSES = ['pending', 'assigned', 'delivered', 'cancelled']
+
 export default function Orders() {
     const qc = useQueryClient()
     const [modal, setModal] = useState<ModalState>(null)
+    const [page, setPage] = useState(1)
+    const PAGE_SIZE = 20
 
-    const { data: orders = [], isLoading } = useQuery({ queryKey: ['orders'], queryFn: listOrders })
+    const [searchInput, setSearchInput] = useState('')
+    const [search, setSearch] = useState('')
+    const [warehouseFilter, setWarehouseFilter] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
+
+    useEffect(() => {
+        const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+        return () => clearTimeout(t)
+    }, [searchInput])
+
+    const filters = { warehouse_id: warehouseFilter, status: statusFilter, search }
+    const hasFilters = !!warehouseFilter || !!statusFilter || !!searchInput
+
+    function clearFilters() {
+        setSearchInput('')
+        setSearch('')
+        setWarehouseFilter('')
+        setStatusFilter('')
+        setPage(1)
+    }
+
+    const { data, isLoading, isFetching } = useQuery({
+        queryKey: ['orders', page, filters],
+        queryFn: () => listOrders(page, PAGE_SIZE, filters),
+        placeholderData: (prev) => prev,
+    })
+    const orders = data?.items ?? []
+    const totalPages = data?.pages ?? 1
+    const total = data?.total ?? 0
+
     const { data: warehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: listWarehouses })
 
     const invalidate = () => qc.invalidateQueries({ queryKey: ['orders'] })
@@ -271,7 +304,7 @@ export default function Orders() {
                 <div>
                     <h1 className="text-xl font-semibold text-white">Orders</h1>
                     <p className="text-sm text-white/40 mt-1">
-                        {isLoading ? 'Loading...' : `${orders.length} orders`}
+                        {isLoading ? 'Loading...' : `${total} orders`}
                     </p>
                 </div>
                 <Button
@@ -283,7 +316,60 @@ export default function Orders() {
                 </Button>
             </div>
 
-            <div className="rounded-xl border border-white/10 overflow-hidden">
+            {/* Filter bar */}
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-48">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-white/30 pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Search orders..."
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        className="w-full h-9 rounded-lg bg-white/5 border border-white/10 pl-8 pr-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 transition-colors"
+                    />
+                </div>
+
+                <select
+                    value={warehouseFilter}
+                    onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1) }}
+                    className="h-9 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-white/30 transition-colors"
+                >
+                    <option value="" className="bg-[#1a1a1a]">All warehouses</option>
+                    {warehouses.map((w) => (
+                        <option key={w.warehouse_id} value={w.warehouse_id} className="bg-[#1a1a1a]">
+                            {w.name}
+                        </option>
+                    ))}
+                </select>
+
+                <select
+                    value={statusFilter}
+                    onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+                    className="h-9 rounded-lg bg-white/5 border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-white/30 transition-colors"
+                >
+                    <option value="" className="bg-[#1a1a1a]">All statuses</option>
+                    {STATUSES.map((s) => (
+                        <option key={s} value={s} className="bg-[#1a1a1a]">{s}</option>
+                    ))}
+                </select>
+
+                {hasFilters && (
+                    <button
+                        onClick={clearFilters}
+                        className="h-9 px-3 rounded-lg text-xs text-white/40 hover:text-white hover:bg-white/5 border border-white/10 transition-colors flex items-center gap-1.5"
+                    >
+                        <X className="size-3" />
+                        Clear
+                    </button>
+                )}
+            </div>
+
+            <div className="relative rounded-xl border border-white/10 overflow-hidden">
+                {isFetching && !isLoading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 backdrop-blur-[1px] rounded-xl">
+                        <Loader2 className="size-6 animate-spin text-white/60" />
+                    </div>
+                )}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
@@ -341,6 +427,55 @@ export default function Orders() {
                     </table>
                 </div>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                    <p className="text-xs text-white/30">
+                        Page {page} of {totalPages} · {total} total
+                    </p>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="h-8 px-3 rounded-lg text-xs text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Previous
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                            .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...')
+                                acc.push(p)
+                                return acc
+                            }, [])
+                            .map((item, idx) =>
+                                item === '...' ? (
+                                    <span key={`ellipsis-${idx}`} className="px-1 text-white/20 text-xs">…</span>
+                                ) : (
+                                    <button
+                                        key={item}
+                                        onClick={() => setPage(item as number)}
+                                        className={`size-8 rounded-lg text-xs transition-colors ${
+                                            page === item
+                                                ? 'bg-white text-[#1a1a1a] font-medium'
+                                                : 'text-white/50 hover:text-white hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {item}
+                                    </button>
+                                )
+                            )}
+                        <button
+                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            className="h-8 px-3 rounded-lg text-xs text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {(modal?.type === 'create' || modal?.type === 'edit') && (
                 <OrderModal

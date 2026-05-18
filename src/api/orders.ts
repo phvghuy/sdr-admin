@@ -1,8 +1,20 @@
 import client from './client';
-import type { Order } from '@/types/api';
+import type { Order, PaginatedResponse } from '@/types/api';
 
-export async function listOrders(): Promise<Order[]> {
-    const { data } = await client.get('/orders');
+type OrderFilters = {
+    warehouse_id?: string
+    status?: string
+    search?: string
+}
+
+export async function listOrders(page = 1, size = 20, filters: OrderFilters = {}): Promise<PaginatedResponse<Order>> {
+    const params = {
+        page, size,
+        ...(filters.warehouse_id && { warehouse_id: filters.warehouse_id }),
+        ...(filters.status && { status: filters.status }),
+        ...(filters.search && { search: filters.search }),
+    }
+    const { data } = await client.get('/orders', { params });
     return data;
 }
 

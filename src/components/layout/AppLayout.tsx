@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Upload, Zap, Map, Package, LogOut, Truck } from 'lucide-react'
+import { LayoutDashboard, Upload, Zap, Map, Package, LogOut, Truck, Car, Warehouse } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { logout as logoutApi } from '@/api/auth'
 import { useJobPoller } from '@/hooks/useJobPoller'
@@ -10,8 +10,8 @@ const navItems = [
     { to: '/optimize', icon: Zap, label: 'Optimize' },
     { to: '/routes', icon: Map, label: 'Routes' },
     { to: '/orders', icon: Package, label: 'Orders' },
-    { to: '/orders', icon: Package, label: 'Vehicles' },
-    { to: '/orders', icon: Package, label: 'Warehouses' },
+    { to: '/vehicles', icon: Car, label: 'Vehicles' },
+    { to: '/warehouses', icon: Warehouse, label: 'Warehouses' },
 ]
 
 export default function AppLayout() {
@@ -38,7 +38,7 @@ export default function AppLayout() {
                 <nav className='flex-1 px-3 py-4 space-y-0.5'>
                     {navItems.map(({ to, icon: Icon, label }) => (
                         <NavLink
-                            key={to}
+                            key={label}
                             to={to}
                             className={({ isActive }) =>
                                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${isActive

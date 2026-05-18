@@ -5,6 +5,8 @@ import Orders from '@/pages/Orders'
 import RoutesPage from '@/pages/Routes'
 import Import from '@/pages/Import'
 import Optimize from '@/pages/Optimize'
+import Vehicles from '@/pages/Vehicles'
+import Warehouses from '@/pages/Warehouses'
 import AppLayout from './components/layout/AppLayout'
 
 function isAuthenticated() {
@@ -24,6 +26,8 @@ export default function App() {
         <Route path="/import" element={<Import />} />
         <Route path="/optimize" element={<Optimize />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/vehicles" element={<Vehicles />} />
+        <Route path="/warehouses" element={<Warehouses />} />
         <Route path="/routes" element={<RoutesPage />} />
       </Route>
       <Route path="/login" element={<Login />} />

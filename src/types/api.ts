@@ -72,6 +72,14 @@ type OptimizeResponse = {
     }[];
 };
 
+type PaginatedResponse<T> = {
+    items: T[];
+    total: number;
+    page: number;
+    size: number;
+    pages: number;
+};
+
 type JobResponse = {
     job_id: string;
     status: 'pending' | 'success' | 'failure' | 'expired';
@@ -82,6 +90,7 @@ type JobResponse = {
 export type {
     LoginResponse,
     ImportResponse,
+    PaginatedResponse,
     Order,
     Vehicle,
     Warehouse,

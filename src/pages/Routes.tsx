@@ -250,7 +250,8 @@ export default function RoutesPage() {
     const [activeSolver, setActiveSolver] = useState('')
     const [activeVehicle, setActiveVehicle] = useState<string | null>(null)
 
-    const { data: allOrders = [] } = useQuery({ queryKey: ['orders'], queryFn: listOrders })
+    const { data: ordersData } = useQuery({ queryKey: ['orders-all'], queryFn: () => listOrders(1, 10000) })
+    const allOrders = ordersData?.items ?? []
     const { data: allWarehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: listWarehouses })
 
     const orderMap = useMemo(
