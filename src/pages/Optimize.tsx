@@ -1,5 +1,6 @@
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Zap, Loader2, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { Zap, Loader2, CheckCircle2, XCircle, Clock, AlertCircle, Map, Info } from 'lucide-react'
 import { runOptimizeAsync } from '@/api/optimize'
 import { getJob } from '@/api/jobs'
 import type { KPI, VehicleKpi } from '@/types/api'
@@ -82,15 +83,21 @@ function VehicleTable({ rows }: { rows: VehicleKpi[] }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Optimize() {
+    const navigate = useNavigate()
     const activeJobId = useOptimizeStore((s) => s.activeJobId)
+    const runs = useOptimizeStore((s) => s.runs)
+    const lastFailure = useOptimizeStore((s) => s.lastFailure)
     const setActiveJobId = useOptimizeStore((s) => s.setActiveJobId)
+    const setLastFailure = useOptimizeStore((s) => s.setLastFailure)
+
+    const latestRun = runs[0] ?? null
 
     const trigger = useMutation({
         mutationFn: runOptimizeAsync,
+        onMutate: () => setLastFailure(null),
         onSuccess: (id) => setActiveJobId(id),
     })
 
-    // reads from TanStack Query cache — AppLayout's useJobPoller keeps it alive
     const { data: job } = useQuery({
         queryKey: ['job', activeJobId],
         queryFn: () => getJob(activeJobId!),
@@ -98,6 +105,7 @@ export default function Optimize() {
     })
 
     const isRunning = trigger.isPending || job?.status === 'pending'
+    const currentStatus = isRunning ? 'pending' : latestRun ? 'success' : null
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
@@ -111,15 +119,15 @@ export default function Optimize() {
             <Card className="bg-[#171717] border-white/10">
                 <CardContent className="flex items-center justify-between gap-4 py-5">
                     <div className="space-y-1">
-                        {job ? (
+                        {currentStatus ? (
                             <>
-                                <StatusBadge status={job.status} />
-                                <p className="text-xs text-white/30 font-mono">Job {job.job_id}</p>
+                                <StatusBadge status={currentStatus} />
+                                <p className="text-xs text-white/30 font-mono">
+                                    Job {job?.job_id ?? latestRun?.jobId}
+                                </p>
                             </>
                         ) : (
-                            <p className="text-sm text-white/60">
-                                No optimization has been run yet.
-                            </p>
+                            <p className="text-sm text-white/60">No optimization has been run yet.</p>
                         )}
                     </div>
 
@@ -141,46 +149,77 @@ export default function Optimize() {
                 </div>
             )}
 
-            {(job?.status === 'failure' || job?.status === 'expired') && (
+            {lastFailure?.status === 'expired' && (
                 <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
-                    <AlertCircle className="size-4 text-red-400 shrink-0" />
-                    <p className="text-sm text-red-400">
-                        {job.status === 'expired'
-                            ? 'The job expired before completing.'
-                            : job.error ?? 'Optimization failed.'}
-                    </p>
+                    <Clock className="size-4 text-red-400 shrink-0" />
+                    <p className="text-sm text-red-400">The job timed out before completing. Try running again.</p>
                 </div>
             )}
 
-            {job?.status === 'success' && job.result && job.result.results.map((r) => (
-                <div key={r.solver} className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-sm font-semibold text-white uppercase tracking-wide">
-                            {r.solver}
-                        </h2>
-                        <span className="text-xs text-white/30">
-                            {r.routes.length} routes · {r.unassigned_orders.length} unassigned
-                        </span>
+            {lastFailure?.status === 'failure' && (
+                lastFailure.error === 'No pending orders left' ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                        <Info className="size-4 text-amber-400 shrink-0" />
+                        <p className="text-sm text-amber-400">
+                            No pending orders to optimize. All orders may have already been delivered.
+                        </p>
                     </div>
+                ) : (
+                    <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
+                        <AlertCircle className="size-4 text-red-400 shrink-0" />
+                        <p className="text-sm text-red-400">{lastFailure.error ?? 'Optimization failed. Please try again.'}</p>
+                    </div>
+                )
+            )}
 
-                    <KpiCards kpi={r.kpi} />
-
-                    {r.kpi.per_vehicle.length > 0 && (
-                        <VehicleTable rows={r.kpi.per_vehicle} />
-                    )}
-
-                    {r.unassigned_orders.length > 0 && (
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                            <p className="text-xs font-medium text-amber-400 mb-1">
-                                Unassigned orders ({r.unassigned_orders.length})
-                            </p>
-                            <p className="text-xs text-white/40 font-mono">
-                                {r.unassigned_orders.join(', ')}
+            {latestRun && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-xs text-white/30">
+                                {new Date(latestRun.runAt).toLocaleString()} · Job {latestRun.jobId}
                             </p>
                         </div>
-                    )}
+                        <Button
+                            onClick={() => navigate('/routes')}
+                            className="h-9 bg-white/10 text-white hover:bg-white/15 border border-white/10"
+                        >
+                            <Map className="size-4" />
+                            View Routes Map
+                        </Button>
+                    </div>
+
+                    {latestRun.result.results.map((r) => (
+                        <div key={r.solver} className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-sm font-semibold text-white uppercase tracking-wide">
+                                    {r.solver}
+                                </h2>
+                                <span className="text-xs text-white/30">
+                                    {r.routes.length} routes · {r.unassigned_orders.length} unassigned
+                                </span>
+                            </div>
+
+                            <KpiCards kpi={r.kpi} />
+
+                            {r.kpi.per_vehicle.length > 0 && (
+                                <VehicleTable rows={r.kpi.per_vehicle} />
+                            )}
+
+                            {r.unassigned_orders.length > 0 && (
+                                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                                    <p className="text-xs font-medium text-amber-400 mb-1">
+                                        Unassigned orders ({r.unassigned_orders.length})
+                                    </p>
+                                    <p className="text-xs text-white/40 font-mono">
+                                        {r.unassigned_orders.join(', ')}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
-            ))}
+            )}
         </div>
     )
 }

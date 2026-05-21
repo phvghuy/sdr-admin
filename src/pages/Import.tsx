@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { Upload, FileText, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { Upload, FileText, CheckCircle2, AlertCircle, X, ArrowRight } from 'lucide-react'
 import { importCSV } from '@/api/import'
 import type { ImportResponse } from '@/types/api'
 import { Button } from '@/components/ui/button'
@@ -93,7 +94,7 @@ function FilePicker({
     )
 }
 
-function ResultCard({ result }: { result: ImportResponse }) {
+function ResultCard({ result, onOptimize }: { result: ImportResponse; onOptimize: () => void }) {
     const stats = [
         { label: 'Orders', value: result.imported_orders },
         { label: 'Vehicles', value: result.imported_vehicles },
@@ -106,7 +107,7 @@ function ResultCard({ result }: { result: ImportResponse }) {
                 <CheckCircle2 className="size-4 text-emerald-400" />
                 <span className="text-sm font-medium text-emerald-400">Import successful</span>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 mb-4">
                 {stats.map(({ label, value }) => (
                     <div key={label} className="rounded-lg bg-white/5 px-4 py-3 text-center">
                         <p className="text-2xl font-semibold text-white">{value}</p>
@@ -114,11 +115,19 @@ function ResultCard({ result }: { result: ImportResponse }) {
                     </div>
                 ))}
             </div>
+            <Button
+                onClick={onOptimize}
+                className="w-full h-10 bg-emerald-500 text-white hover:bg-emerald-400"
+            >
+                Go to Optimize
+                <ArrowRight className="size-4 ml-2" />
+            </Button>
         </div>
     )
 }
 
 export default function Import() {
+    const navigate = useNavigate()
     const [files, setFiles] = useState<Record<string, File | null>>({
         orders: null,
         vehicles: null,
@@ -137,7 +146,7 @@ export default function Import() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-lg mx-auto">
             <div className="mb-6">
                 <h1 className="text-xl font-semibold text-white">Import CSV</h1>
                 <p className="text-sm text-white/40 mt-1">
@@ -181,7 +190,7 @@ export default function Import() {
 
             {mutation.isSuccess && mutation.data && (
                 <div className="mt-4">
-                    <ResultCard result={mutation.data} />
+                    <ResultCard result={mutation.data} onOptimize={() => navigate('/optimize')} />
                 </div>
             )}
         </div>

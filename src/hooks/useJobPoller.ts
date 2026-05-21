@@ -7,6 +7,7 @@ export function useJobPoller() {
     const activeJobId = useOptimizeStore((s) => s.activeJobId)
     const addRun = useOptimizeStore((s) => s.addRun)
     const setActiveJobId = useOptimizeStore((s) => s.setActiveJobId)
+    const setLastFailure = useOptimizeStore((s) => s.setLastFailure)
 
     const { data: job } = useQuery({
         queryKey: ['job', activeJobId],
@@ -21,6 +22,7 @@ export function useJobPoller() {
         if (job.status === 'success' && job.result) {
             addRun(job.job_id, job.result)
         } else if (job.status === 'failure' || job.status === 'expired') {
+            setLastFailure({ jobId: job.job_id, status: job.status, error: job.error })
             setActiveJobId(null)
         }
     }, [job, addRun, setActiveJobId])

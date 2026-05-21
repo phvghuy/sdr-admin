@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { useQuery } from '@tanstack/react-query'
 import 'leaflet/dist/leaflet.css'
@@ -214,7 +215,7 @@ function RunSelector({ runs, selectedIndex, onChange }: {
         >
             {runs.map((run, i) => (
                 <option key={run.jobId} value={i} className="bg-[#1c1c1c]">
-                    Run #{runs.length - i} — {run.runAt.toLocaleString()}
+                    Run #{runs.length - i} — {new Date(run.runAt).toLocaleString()}
                 </option>
             ))}
         </select>
@@ -246,9 +247,17 @@ function SolverTabs({ solvers, active, onChange }: {
 
 export default function RoutesPage() {
     const runs = useOptimizeStore((s) => s.runs)
-    const [runIndex, setRunIndex] = useState(0)
+    const [searchParams, setSearchParams] = useSearchParams()
     const [activeSolver, setActiveSolver] = useState('')
     const [activeVehicle, setActiveVehicle] = useState<string | null>(null)
+
+    const jobParam = searchParams.get('job')
+    const runIndex = jobParam ? Math.max(runs.findIndex((r) => r.jobId === jobParam), 0) : 0
+
+    function setRunIndex(i: number) {
+        setSearchParams({ job: runs[i].jobId }, { replace: true })
+        setActiveVehicle(null)
+    }
 
     const { data: ordersData } = useQuery({ queryKey: ['orders-all'], queryFn: () => listOrders(1, 10000) })
     const allOrders = ordersData?.items ?? []
@@ -291,7 +300,7 @@ export default function RoutesPage() {
                     <RunSelector
                         runs={runs}
                         selectedIndex={runIndex}
-                        onChange={(i) => { setRunIndex(i); setActiveVehicle(null) }}
+                        onChange={setRunIndex}
                     />
                 </div>
             </div>

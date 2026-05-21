@@ -37,7 +37,7 @@ export function LoginForm({
       localStorage.setItem('access_token', access_token)
       navigate('/dashboard')
     } catch {
-      setError('Email hoặc mật khẩu không đúng')
+      setError('Invalid email or password')
       setLoading(false)
     }
   }
@@ -94,13 +94,33 @@ export function LoginForm({
                   disabled={loading}
                   className="h-10 bg-white text-[#171717] hover:bg-white/90 disabled:opacity-60"
                 >
-                  {loading ? "Login..." : "Login"}
+                  {loading ? 'Logging in...' : 'Login'}
                 </Button>
               </Field>
             </FieldGroup>
           </form>
         </CardContent>
       </Card>
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4">
+        <p className="text-xs font-medium text-white/40 mb-2">Demo account</p>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs text-white/60">
+              <span className="text-white/30">Email</span>&ensp;demo@sdr.com
+            </p>
+            <p className="text-xs text-white/60">
+              <span className="text-white/30">Password</span>&ensp;demo123
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setEmail('demo@sdr.com'); setPassword('demo123') }}
+            className="text-xs font-medium text-[#171717] bg-white hover:bg-white/90 transition-colors px-3 py-1.5 rounded-lg"
+          >
+            Fill
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

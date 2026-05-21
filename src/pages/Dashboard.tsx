@@ -1,16 +1,73 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Upload, Zap, Map, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Upload, Zap, Map, ArrowRight, ChevronDown, ChevronUp, History } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useOptimizeStore, type OptimizeRun } from '@/store/optimizeStore'
+import { listOrders } from '@/api/orders'
 import type { KPI, VehicleKpi } from '@/types/api'
+import { OrderStatusChart, OptimizationTrendChart, VehicleFillRateChart } from '@/components/charts/DashboardCharts'
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function timeAgo(iso: string): string {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    return `${Math.floor(hrs / 24)}d ago`
+}
+
+// ── Stats strip ───────────────────────────────────────────────────────────────
+
+function StatsStrip({ latestRun }: { latestRun: OptimizeRun | null }) {
+    const { data: total } = useQuery({
+        queryKey: ['orders-count', 'all'],
+        queryFn: () => listOrders(1, 1),
+        select: (d) => d.total,
+        staleTime: 30_000,
+    })
+    const { data: pending } = useQuery({
+        queryKey: ['orders-count', 'pending'],
+        queryFn: () => listOrders(1, 1, { status: 'pending' }),
+        select: (d) => d.total,
+        staleTime: 30_000,
+    })
+    const { data: delivered } = useQuery({
+        queryKey: ['orders-count', 'delivered'],
+        queryFn: () => listOrders(1, 1, { status: 'delivered' }),
+        select: (d) => d.total,
+        staleTime: 30_000,
+    })
+
+    const kpi = latestRun?.result.results[0]?.kpi
+
+    const stats = [
+        { label: 'Total Orders', value: total ?? '—', color: 'text-white' },
+        { label: 'Pending', value: pending ?? '—', color: pending ? 'text-amber-400' : 'text-white' },
+        { label: 'Delivered', value: delivered ?? '—', color: 'text-emerald-400' },
+        {
+            label: 'Last Distance',
+            value: kpi ? `${kpi.total_distance_km.toFixed(1)} km` : '—',
+            color: 'text-white',
+            sub: latestRun ? timeAgo(latestRun.runAt) : undefined,
+        },
+        { label: 'Vehicles Used', value: kpi?.vehicles_used ?? '—', color: 'text-white' },
+        {
+            label: 'Unassigned',
+            value: kpi?.unassigned_count ?? '—',
+            color: kpi && kpi.unassigned_count > 0 ? 'text-amber-400' : 'text-white',
+        },
+    ]
+
     return (
-        <div className="rounded-xl bg-white/5 border border-white/10 px-5 py-4">
-            <p className="text-xs text-white/40 mb-1">{label}</p>
-            <p className="text-2xl font-semibold text-white">{value}</p>
+        <div className="rounded-xl border border-white/10 bg-[#171717] flex flex-wrap sm:flex-nowrap divide-y sm:divide-y-0 sm:divide-x divide-white/[0.06]">
+            {stats.map(({ label, value, color, sub }) => (
+                <div key={label} className="flex-1 min-w-[33%] sm:min-w-0 px-5 py-4">
+                    <p className="text-xs text-white/40 mb-1 whitespace-nowrap">{label}</p>
+                    <p className={`text-xl font-semibold ${color}`}>{value}</p>
+                    {sub && <p className="text-xs text-white/30 mt-0.5">{sub}</p>}
+                </div>
+            ))}
         </div>
     )
 }
@@ -18,13 +75,21 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 // ── KPI section ───────────────────────────────────────────────────────────────
 
 function KpiSection({ kpi }: { kpi: KPI }) {
+    const items = [
+        { label: 'Total Distance', value: `${kpi.total_distance_km.toFixed(1)} km` },
+        { label: 'Vehicles Used', value: kpi.vehicles_used },
+        { label: 'Unassigned', value: kpi.unassigned_count },
+        { label: 'Fill Rate (Weight)', value: `${(kpi.average_fill_rate_weight * 100).toFixed(1)}%` },
+        { label: 'Fill Rate (Volume)', value: `${(kpi.average_fill_rate_volume * 100).toFixed(1)}%` },
+    ]
     return (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <StatCard label="Total Distance" value={`${kpi.total_distance_km.toFixed(1)} km`} />
-            <StatCard label="Vehicles Used" value={kpi.vehicles_used} />
-            <StatCard label="Unassigned Orders" value={kpi.unassigned_count} />
-            <StatCard label="Avg Fill Rate (Weight)" value={`${(kpi.average_fill_rate_weight * 100).toFixed(1)}%`} />
-            <StatCard label="Avg Fill Rate (Volume)" value={`${(kpi.average_fill_rate_volume * 100).toFixed(1)}%`} />
+            {items.map(({ label, value }) => (
+                <div key={label} className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+                    <p className="text-xs text-white/40 mb-1">{label}</p>
+                    <p className="text-lg font-semibold text-white">{value}</p>
+                </div>
+            ))}
         </div>
     )
 }
@@ -62,8 +127,9 @@ function VehicleTable({ rows }: { rows: VehicleKpi[] }) {
 
 // ── Run card ──────────────────────────────────────────────────────────────────
 
-function RunCard({ run, index, defaultOpen }: { run: OptimizeRun; index: number; defaultOpen: boolean }) {
-    const [open, setOpen] = useState(defaultOpen)
+function RunCard({ run, index }: { run: OptimizeRun; index: number }) {
+    const navigate = useNavigate()
+    const [open, setOpen] = useState(false)
     const firstSolver = run.result.results[0]
 
     return (
@@ -81,7 +147,7 @@ function RunCard({ run, index, defaultOpen }: { run: OptimizeRun; index: number;
                             {run.result.results.map((r) => r.solver).join(' · ')}
                         </p>
                         <p className="text-xs text-white/30 mt-0.5">
-                            {run.runAt.toLocaleString()} · Job {run.jobId}
+                            {new Date(run.runAt).toLocaleString()} · Job {run.jobId}
                         </p>
                     </div>
                 </div>
@@ -116,11 +182,20 @@ function RunCard({ run, index, defaultOpen }: { run: OptimizeRun; index: number;
                 <div className="px-5 pb-5 space-y-5 border-t border-white/10 pt-5">
                     {run.result.results.map((r) => (
                         <div key={r.solver} className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wide">{r.solver}</h3>
-                                <span className="text-xs text-white/30">
-                                    {r.routes.length} routes · {r.unassigned_orders.length} unassigned
-                                </span>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wide">{r.solver}</h3>
+                                    <span className="text-xs text-white/30">
+                                        {r.routes.length} routes · {r.unassigned_orders.length} unassigned
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/routes?job=${run.jobId}`) }}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                                >
+                                    <Map className="size-4" />
+                                    View Map
+                                </button>
                             </div>
                             <KpiSection kpi={r.kpi} />
                             {r.kpi.per_vehicle.length > 0 && <VehicleTable rows={r.kpi.per_vehicle} />}
@@ -141,29 +216,26 @@ function EmptyState() {
         { icon: Map, label: 'View Routes', desc: 'Inspect optimized routes and delivery stops', to: '/routes' },
     ]
     return (
-        <div className="mt-2">
-            <p className="text-sm text-white/40 mb-6">Get started by following the steps below.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {steps.map(({ icon: Icon, label, desc, to }, i) => (
-                    <Link
-                        key={to}
-                        to={to}
-                        className="group rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/5 hover:border-white/20 p-5 transition-colors"
-                    >
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="flex size-8 items-center justify-center rounded-lg bg-white/10">
-                                <Icon className="size-4 text-white/60" />
-                            </div>
-                            <span className="text-xs font-medium text-white/30">Step {i + 1}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {steps.map(({ icon: Icon, label, desc, to }, i) => (
+                <Link
+                    key={to}
+                    to={to}
+                    className="group rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/5 hover:border-white/20 p-5 transition-colors"
+                >
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-white/10">
+                            <Icon className="size-4 text-white/60" />
                         </div>
-                        <p className="text-sm font-medium text-white mb-1">{label}</p>
-                        <p className="text-xs text-white/40 leading-relaxed">{desc}</p>
-                        <div className="mt-4 flex items-center gap-1 text-xs text-white/30 group-hover:text-white/60 transition-colors">
-                            Go <ArrowRight className="size-3" />
-                        </div>
-                    </Link>
-                ))}
-            </div>
+                        <span className="text-xs font-medium text-white/30">Step {i + 1}</span>
+                    </div>
+                    <p className="text-sm font-medium text-white mb-1">{label}</p>
+                    <p className="text-xs text-white/40 leading-relaxed">{desc}</p>
+                    <div className="mt-4 flex items-center gap-1 text-xs text-white/30 group-hover:text-white/60 transition-colors">
+                        Go <ArrowRight className="size-3" />
+                    </div>
+                </Link>
+            ))}
         </div>
     )
 }
@@ -172,42 +244,70 @@ function EmptyState() {
 
 export default function Dashboard() {
     const runs = useOptimizeStore((s) => s.runs)
+    const latestRun = runs[0] ?? null
 
     return (
         <div className="space-y-6">
-            <div className="flex items-start justify-between">
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-semibold text-white">Dashboard</h1>
                     <p className="text-sm text-white/40 mt-1">
-                        {runs.length > 0
-                            ? `${runs.length} optimization run${runs.length > 1 ? 's' : ''}`
+                        {latestRun
+                            ? `Last optimized ${timeAgo(latestRun.runAt)}`
                             : 'No optimization has been run yet.'}
                     </p>
                 </div>
-                {runs.length > 0 && (
-                    <Link
-                        to="/optimize"
-                        className="text-xs text-white/40 hover:text-white transition-colors flex items-center gap-1"
-                    >
-                        Run again <ArrowRight className="size-3" />
-                    </Link>
+                <Link
+                    to="/optimize"
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors"
+                >
+                    <Zap className="size-3.5" />
+                    Run Optimization
+                </Link>
+            </div>
+
+            {/* Stats strip */}
+            <StatsStrip latestRun={latestRun} />
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <OrderStatusChart />
+                <div className="lg:col-span-2">
+                    <OptimizationTrendChart />
+                </div>
+            </div>
+
+            <VehicleFillRateChart />
+
+            {/* Optimization history */}
+            <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                    <History className="size-3.5 text-white/30" />
+                    <h2 className="text-xs font-medium text-white/40 uppercase tracking-wide">
+                        Optimization History
+                    </h2>
+                    {runs.length > 0 && (
+                        <span className="text-xs text-white/20">{runs.length} run{runs.length > 1 ? 's' : ''}</span>
+                    )}
+                </div>
+
+                {runs.length === 0 ? (
+                    <EmptyState />
+                ) : (
+                    <div className="space-y-2">
+                        {runs.map((run, i) => (
+                            <RunCard
+                                key={run.jobId}
+                                run={run}
+                                index={runs.length - i}
+                            />
+                        ))}
+                    </div>
                 )}
             </div>
 
-            {runs.length === 0 ? (
-                <EmptyState />
-            ) : (
-                <div className="space-y-3">
-                    {runs.map((run, i) => (
-                        <RunCard
-                            key={run.jobId}
-                            run={run}
-                            index={runs.length - i}
-                            defaultOpen={i === 0}
-                        />
-                    ))}
-                </div>
-            )}
         </div>
     )
 }
