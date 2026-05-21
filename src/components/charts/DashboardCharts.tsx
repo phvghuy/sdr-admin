@@ -222,7 +222,7 @@ export function VehicleFillRateChart() {
                     />
                     <Tooltip
                         {...TOOLTIP_STYLE}
-                        formatter={(value: number) => `${value}%`}
+                        formatter={(value) => `${value}%`}
                     />
                     <Legend
                         wrapperStyle={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', paddingTop: '8px' }}
