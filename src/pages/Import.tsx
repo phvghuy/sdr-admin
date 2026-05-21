@@ -133,6 +133,7 @@ export default function Import() {
         vehicles: null,
         warehouses: null,
     })
+    const [loadingSample, setLoadingSample] = useState(false)
 
     const mutation = useMutation({
         mutationFn: () => importCSV(files.orders!, files.vehicles!, files.warehouses!),
@@ -143,6 +144,25 @@ export default function Import() {
     function handleChange(key: string, file: File | null) {
         setFiles((prev) => ({ ...prev, [key]: file }))
         if (mutation.isSuccess || mutation.isError) mutation.reset()
+    }
+
+    async function loadSampleFiles() {
+        setLoadingSample(true)
+        try {
+            const [orders, vehicles, warehouses] = await Promise.all([
+                fetch('/samples/orders.csv').then((r) => r.blob()),
+                fetch('/samples/vehicles.csv').then((r) => r.blob()),
+                fetch('/samples/warehouses.csv').then((r) => r.blob()),
+            ])
+            setFiles({
+                orders: new File([orders], 'orders.csv', { type: 'text/csv' }),
+                vehicles: new File([vehicles], 'vehicles.csv', { type: 'text/csv' }),
+                warehouses: new File([warehouses], 'warehouses.csv', { type: 'text/csv' }),
+            })
+            mutation.reset()
+        } finally {
+            setLoadingSample(false)
+        }
     }
 
     return (
@@ -156,7 +176,16 @@ export default function Import() {
 
             <Card className="bg-[#171717] border-white/10">
                 <CardHeader className="pb-4">
-                    <CardTitle className="text-sm font-medium text-white/60">Select files</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium text-white/60">Select files</CardTitle>
+                        <button
+                            onClick={loadSampleFiles}
+                            disabled={loadingSample}
+                            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/15 transition-colors disabled:opacity-40"
+                        >
+                            {loadingSample ? 'Loading...' : 'Use sample data'}
+                        </button>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {FILE_SLOTS.map((slot) => (
