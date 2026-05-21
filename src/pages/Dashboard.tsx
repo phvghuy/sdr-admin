@@ -246,6 +246,16 @@ export default function Dashboard() {
     const runs = useOptimizeStore((s) => s.runs)
     const latestRun = runs[0] ?? null
 
+    if (runs.length === 0) return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+                <p className="text-sm text-white/40 mt-1">Get started by following the steps below.</p>
+            </div>
+            <EmptyState />
+        </div>
+    )
+
     return (
         <div className="space-y-6">
 
@@ -253,11 +263,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-                    <p className="text-sm text-white/40 mt-1">
-                        {latestRun
-                            ? `Last optimized ${timeAgo(latestRun.runAt)}`
-                            : 'No optimization has been run yet.'}
-                    </p>
+                    <p className="text-sm text-white/40 mt-1">Last optimized {timeAgo(latestRun!.runAt)}</p>
                 </div>
                 <Link
                     to="/optimize"
@@ -288,24 +294,17 @@ export default function Dashboard() {
                     <h2 className="text-xs font-medium text-white/40 uppercase tracking-wide">
                         Optimization History
                     </h2>
-                    {runs.length > 0 && (
-                        <span className="text-xs text-white/20">{runs.length} run{runs.length > 1 ? 's' : ''}</span>
-                    )}
+                    <span className="text-xs text-white/20">{runs.length} run{runs.length > 1 ? 's' : ''}</span>
                 </div>
-
-                {runs.length === 0 ? (
-                    <EmptyState />
-                ) : (
-                    <div className="space-y-2">
-                        {runs.map((run, i) => (
-                            <RunCard
-                                key={run.jobId}
-                                run={run}
-                                index={runs.length - i}
-                            />
-                        ))}
-                    </div>
-                )}
+                <div className="space-y-2">
+                    {runs.map((run, i) => (
+                        <RunCard
+                            key={run.jobId}
+                            run={run}
+                            index={runs.length - i}
+                        />
+                    ))}
+                </div>
             </div>
 
         </div>
